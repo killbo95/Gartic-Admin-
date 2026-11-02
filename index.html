@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101827">
+  <title>Gartic Admin | Student Portal</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body data-page="student">
+  <main class="shell">
+    <header class="topbar"><a class="brand" href="index.html">GARTIC <span>ADMIN</span></a><a class="quiet-link" href="admin.html">Admin</a></header>
+    <section class="hero">
+      <p class="eyebrow">CLASSROOM GAME SESSION</p>
+      <h1>Play together.<br><span>Stay in sync.</span></h1>
+      <p class="lede">Join a session created by your session administrator. Use this portal only when your teacher has approved the game.</p>
+    </section>
+    <section class="panel" id="join-panel">
+      <h2>Join a session</h2>
+      <form id="join-form">
+        <label for="room-code">Session code</label>
+        <div class="join-row"><input id="room-code" name="code" maxlength="6" autocomplete="off" placeholder="6-character code" required><button class="primary" type="submit">Join session</button></div>
+      </form>
+      <p class="message" id="join-message" aria-live="polite"></p>
+    </section>
+    <section class="panel hidden" id="session-panel">
+      <div class="session-head"><div><p class="eyebrow">SESSION ACTIVE</p><h2>You're connected</h2></div><span class="live-dot">LIVE</span></div>
+      <p id="session-status">Waiting for session details…</p>
+      <div class="notice"><strong>Gartic Phone</strong><p>If the game does not load here, the official site may block embedding. Open it using the official link below; the portal can still show when the managed session ends, but cannot close an external tab.</p><a class="text-link" href="https://garticphone.com/" target="_blank" rel="noopener noreferrer">Open official Gartic Phone ↗</a></div>
+      <div class="game-frame"><iframe title="Official Gartic Phone" src="https://garticphone.com/" allow="fullscreen; clipboard-read; clipboard-write" referrerpolicy="strict-origin-when-cross-origin"></iframe></div>
+      <p class="small muted">Keep this portal open during the session so it can receive session updates.</p>
+    </section>
+    <section class="panel ended hidden" id="ended-panel" role="status"><div class="end-icon">✓</div><h2>Session ended</h2><p>The administrator has ended this managed session. You are disconnected from the portal.</p><button class="secondary" id="back-button" type="button">Back to join page</button></section>
+    <footer>Gartic Admin · Independent classroom session tool · Not affiliated with Gartic Phone</footer>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>
