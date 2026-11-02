@@ -1,0 +1,14 @@
+name = "gartic-admin-session"
+main = "worker.js"
+compatibility_date = "2026-11-02"
+
+[[durable_objects.bindings]]
+name = "SESSION_ROOM"
+class_name = "SessionRoom"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["SessionRoom"]
+
+[vars]
+ALLOWED_ORIGIN = "https://killbo95.github.io"
