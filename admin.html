@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101827">
+  <title>Gartic Admin | Control Room</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body data-page="admin">
+  <main class="shell">
+    <header class="topbar"><a class="brand" href="index.html">GARTIC <span>ADMIN</span></a><a class="quiet-link" href="index.html">Student portal</a></header>
+    <section class="hero compact"><p class="eyebrow">SESSION MANAGEMENT</p><h1>Control <span>room.</span></h1><p class="lede">Create and end teacher-approved sessions. Keep the admin token private.</p></section>
+    <section class="panel">
+      <h2>Administrator access</h2>
+      <label for="admin-token">Admin token</label>
+      <input id="admin-token" type="password" autocomplete="off" placeholder="Paste your Cloudflare secret">
+      <p class="small muted">The token is kept only in this page's memory and is never committed to GitHub.</p>
+      <div class="button-row"><button class="primary" id="connect-button" type="button">Connect</button><span class="message" id="admin-message" aria-live="polite"></span></div>
+    </section>
+    <section class="panel hidden" id="controls-panel">
+      <div class="session-head"><div><p class="eyebrow">CURRENT STATUS</p><h2 id="admin-status">No active session</h2></div><span class="status-pill" id="status-pill">IDLE</span></div>
+      <div class="code-display hidden" id="code-display"><span>SESSION CODE</span><strong id="session-code">------</strong></div>
+      <div class="button-row"><button class="primary" id="start-button" type="button">Start session</button><button class="danger" id="end-button" type="button" disabled>End session</button></div>
+      <p class="small muted">Ending a session updates connected portals. It cannot force-close other browser tabs or control devices outside this portal.</p>
+    </section>
+    <footer>Gartic Admin · Admin actions are recorded by the session service</footer>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>
