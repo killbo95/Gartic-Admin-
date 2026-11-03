@@ -89,6 +89,26 @@ if (document.body.dataset.page === "student") {
 if (document.body.dataset.page === "admin") {
   let token = "";
   const auth = () => ({ "X-Admin-Token": token });
+
+  const roomCreator = $("room-creator-container");
+  const fullscreenButton = $("room-fullscreen-button");
+  fullscreenButton.addEventListener("click", async () => {
+    try {
+      if (!document.fullscreenElement) {
+        if (!roomCreator.requestFullscreen) throw new Error("Fullscreen is not supported by this browser.");
+        await roomCreator.requestFullscreen();
+      } else if (document.fullscreenElement === roomCreator) {
+        await document.exitFullscreen();
+      }
+    } catch (error) {
+      $("admin-message").textContent = error.message || "Could not enter full screen. Try the browser's full-screen option.";
+    }
+  });
+  document.addEventListener("fullscreenchange", () => {
+    fullscreenButton.textContent = document.fullscreenElement === roomCreator
+      ? "Exit full screen ✕"
+      : "Enter full screen ⛶";
+  });
   $("connect-button").addEventListener("click", async () => {
     token = $("admin-token").value.trim();
     $("admin-message").textContent = "Connecting…";
