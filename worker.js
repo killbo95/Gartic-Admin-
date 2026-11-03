@@ -49,7 +49,7 @@ export class SessionRoom {
       return Response.json({
         active: true, waiting: Boolean(member.approved === false), paused: Boolean(state.paused),
         gameUrl: member.approved ? state.gameUrl : null, announcement: state.announcement || "",
-        displayName: member.displayName || displayName
+        warning: member.warning || "", displayName: member.displayName || displayName
       });
     }
 
@@ -85,7 +85,7 @@ export class SessionRoom {
       }
       await save();
       const members = Object.entries(state.members).map(([clientId, m]) => ({
-        clientId, displayName: m.displayName, approved: Boolean(m.approved),
+        clientId, displayName: m.displayName, warning: m.warning || "", approved: Boolean(m.approved),
         connected: !m.approved ? false : now - (m.lastSeen || 0) < 12000,
         joinedAt: m.joinedAt
       }));
@@ -126,6 +126,22 @@ export class SessionRoom {
       if (!state.active || !member) return Response.json({ error: "Participant is no longer waiting." }, { status: 404 });
       member.approved = true; member.lastSeen = Date.now(); log("Participant approved", member.displayName);
       await save(); return Response.json({ ok: true });
+    }
+
+    if (url.pathname === "/warn" && request.method === "POST") {
+      const data = await readBody(); const member = state.members[String(data.clientId || "")];
+      const warning = String(data.message || "").trim().slice(0, 180);
+      if (!state.active || !member || !member.approved || !warning) return Response.json({ error: "Could not send warning to this participant." }, { status: 400 });
+      member.warning = warning; log("Participant warning", member.displayName + ": " + warning);
+      await save(); return Response.json({ ok: true });
+    }
+
+    if (url.pathname === "/regenerate" && request.method === "POST") {
+      if (!state.active) return Response.json({ error: "No active session." }, { status: 409 });
+      const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; const bytes = new Uint8Array(6); crypto.getRandomValues(bytes);
+      state.code = Array.from(bytes, b => alphabet[b % alphabet.length]).join("");
+      state.members = {}; state.kicked = {}; log("Session code regenerated; participants must rejoin");
+      await save(); return Response.json({ ok: true, code: state.code });
     }
 
     if (url.pathname === "/announce" && request.method === "POST") {
@@ -195,14 +211,15 @@ export default {
       "Access-Control-Allow-Headers": "Content-Type,X-Admin-Token", "Vary": "Origin"
     };
     if (request.method === "OPTIONS") return new Response(null, { headers });
-    const adminPaths = ["/api/admin/status", "/api/admin/start", "/api/admin/end", "/api/admin/lock", "/api/admin/kick", "/api/admin/pause", "/api/admin/settings", "/api/admin/approve", "/api/admin/announce"];
+    const adminPaths = ["/api/admin/status", "/api/admin/start", "/api/admin/end", "/api/admin/lock", "/api/admin/kick", "/api/admin/pause", "/api/admin/settings", "/api/admin/approve", "/api/admin/announce", "/api/admin/warn", "/api/admin/regenerate"];
     if (adminPaths.includes(url.pathname) && request.headers.get("X-Admin-Token") !== env.ADMIN_TOKEN) return Response.json({ error: "Unauthorized. Check the admin token." }, { status: 401, headers });
     const room = env.SESSION_ROOM.get(env.SESSION_ROOM.idFromName("main"));
     const routes = {
       "/api/status": "/status", "/api/heartbeat": "/heartbeat", "/api/leave": "/leave", "/api/message": "/message",
       "/api/admin/status": "/admin-status", "/api/admin/start": "/start", "/api/admin/end": "/end",
       "/api/admin/lock": "/lock", "/api/admin/kick": "/kick", "/api/admin/pause": "/pause",
-      "/api/admin/settings": "/settings", "/api/admin/approve": "/approve", "/api/admin/announce": "/announce"
+      "/api/admin/settings": "/settings", "/api/admin/approve": "/approve", "/api/admin/announce": "/announce",
+      "/api/admin/warn": "/warn", "/api/admin/regenerate": "/regenerate"
     };
     const target = routes[url.pathname];
     if (!target) return Response.json({ error: "Not found" }, { status: 404, headers });
