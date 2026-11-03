@@ -188,6 +188,7 @@ if (document.body.dataset.page === "admin") {
       button.className = "danger";
       button.type = "button";
       button.textContent = member.approved ? "Disconnect" : "Reject";
+      row.append(label);
       if (!member.approved) { const approve = document.createElement("button"); approve.className = "secondary"; approve.type = "button"; approve.textContent = "Approve"; approve.addEventListener("click", async () => { try { await api("/api/admin/approve", { method: "POST", headers: auth(), body: JSON.stringify({ clientId: member.clientId }) }); await refresh(); } catch (error) { $("admin-message").textContent = error.message; } }); row.append(approve); }
       button.addEventListener("click", async () => {
         if (!confirm("Disconnect this participant from the managed portal?")) return;
@@ -197,7 +198,7 @@ if (document.body.dataset.page === "admin") {
         } catch (error) { $("admin-message").textContent = error.message; }
       });
       if (member.approved) { const warn = document.createElement("button"); warn.className = "secondary"; warn.type = "button"; warn.textContent = "Warn"; warn.addEventListener("click", async () => { const message = prompt("Enter a short private warning for this participant:"); if (!message) return; try { await api("/api/admin/warn", { method: "POST", headers: auth(), body: JSON.stringify({ clientId: member.clientId, message }) }); await refresh(); } catch (error) { $("admin-message").textContent = error.message; } }); row.append(warn); }
-      row.append(label, button);
+      row.append(button);
       list.append(row);
     });
   }
