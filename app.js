@@ -125,7 +125,7 @@ if (document.body.dataset.page === "admin") {
       show("room-creator-panel", true);
       show("controls-panel", true);
       if (adminPoller) clearInterval(adminPoller);
-      adminPoller = setInterval(() => refresh().catch(() => {}), 5000);
+      adminPoller = setInterval(() => refresh().catch(error => { $("admin-message").textContent = "Refresh failed: " + error.message; }), 5000);
       $("admin-message").textContent = "Connected.";
     } catch (error) {
       token = "";
@@ -147,10 +147,10 @@ if (document.body.dataset.page === "admin") {
     $("lock-button").textContent = data.locked ? "Unlock new joins" : "Lock new joins";
     $("pause-button").disabled = !active;
     $("pause-button").textContent = data.paused ? "Resume session" : "Pause session";
-    $("max-participants").value = data.maxParticipants || 0;
-    $("waiting-room-toggle").checked = Boolean(data.waitingRoom);
-    $("announcement-input").value = data.announcement || "";
-    $("duration-minutes").value = data.durationMinutes || $("duration-minutes").value || 0;
+    if (document.activeElement !== $("max-participants")) $("max-participants").value = data.maxParticipants || 0;
+    if (document.activeElement !== $("waiting-room-toggle")) $("waiting-room-toggle").checked = Boolean(data.waitingRoom);
+    if (document.activeElement !== $("announcement-input")) $("announcement-input").value = data.announcement || "";
+    if (document.activeElement !== $("duration-minutes")) $("duration-minutes").value = data.durationMinutes || $("duration-minutes").value || 0;
     $("session-countdown").value = data.endsAt ? Math.max(0, Math.ceil((data.endsAt - Date.now()) / 60000)) + " min remaining" : "Not timed";
     renderEvents("message-list", data.messages || [], item => item.from + ": " + item.message);
     renderEvents("activity-list", data.activity || [], item => item.type + (item.detail ? " — " + item.detail : ""));
@@ -254,16 +254,34 @@ if (document.body.dataset.page === "admin") {
   }
   $("participant-search").addEventListener("input", () => renderParticipants(latestStatus?.members || []));
   $("save-settings-button").addEventListener("click", async () => {
-    try { await api("/api/admin/settings", { method: "POST", headers: auth(), body: JSON.stringify({ waitingRoom: $("waiting-room-toggle").checked, maxParticipants: Number($("max-participants").value) || 0 }) }); await refresh(); $("admin-message").textContent = "Session settings saved."; }
-    catch (error) { $("admin-message").textContent = error.message; }
+    const button = $("save-settings-button");
+    button.disabled = true;
+    $("admin-message").textContent = "Saving settings…";
+    try {
+      await api("/api/admin/settings", { method: "POST", headers: auth(), body: JSON.stringify({ waitingRoom: $("waiting-room-toggle").checked, maxParticipants: Number($("max-participants").value) || 0 }) });
+      await refresh();
+      $("admin-message").textContent = "Session settings saved successfully.";
+    } catch (error) { $("admin-message").textContent = "Could not save settings: " + error.message; }
+    finally { button.disabled = false; }
   });
   $("pause-button").addEventListener("click", async () => {
     try { const paused = $("pause-button").textContent === "Pause session"; await api("/api/admin/pause", { method: "POST", headers: auth(), body: JSON.stringify({ paused }) }); await refresh(); }
     catch (error) { $("admin-message").textContent = error.message; }
   });
   $("announce-button").addEventListener("click", async () => {
-    try { await api("/api/admin/announce", { method: "POST", headers: auth(), body: JSON.stringify({ message: $("announcement-input").value }) }); await refresh(); $("admin-message").textContent = "Announcement published."; }
-    catch (error) { $("admin-message").textContent = error.message; }
+    const message = $("announcement-input").value.trim();
+    if (!message) { $("admin-message").textContent = "Type an announcement before publishing."; $("announcement-input").focus(); return; }
+    const button = $("announce-button");
+    button.disabled = true;
+    $("admin-message").textContent = "Publishing announcement…";
+    try {
+      await api("/api/admin/announce", { method: "POST", headers: auth(), body: JSON.stringify({ message }) });
+      if (document.activeElement !== $("announcement-input")) $("announcement-input").value = message;
+      await refresh();
+      $("admin-message").textContent = "Announcement published successfully.";
+    } catch (error) {
+      $("admin-message").textContent = "Could not publish: " + error.message;
+    } finally { button.disabled = false; }
   });
   $("export-attendance-button").addEventListener("click", () => {
     const rows = [["Display name","Status","Joined at"], ...(latestStatus?.members || []).map(m => [m.displayName, m.approved ? (m.connected ? "Connected" : "Reconnecting") : "Waiting approval", new Date(m.joinedAt).toISOString()])];
