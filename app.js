@@ -21,6 +21,7 @@ const isOfficialRoomUrl = (value) => {
 if (document.body.dataset.page === "student") {
   let code = "";
   let poller;
+  const clientId = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : "client-" + Math.random().toString(36).slice(2);
   const gameFrame = $("game-frame");
   const gameLink = $("game-room-link");
 
@@ -29,8 +30,10 @@ if (document.body.dataset.page === "student") {
     $("join-message").textContent = "Checking session…";
     code = $("room-code").value.trim().toUpperCase();
     try {
-      const data = await api("/api/status?code=" + encodeURIComponent(code));
+      const data = await api("/api/status?code=" + encodeURIComponent(code) + "&clientId=" + encodeURIComponent(clientId));
       if (!data.active) throw new Error("That session is not active. Check the code with the administrator.");
+      if (data.kicked) throw new Error("You have been disconnected by the administrator.");
+      if (data.locked) throw new Error("This session is locked. Ask the administrator to reopen joining.");
       if (!data.gameUrl || !isOfficialRoomUrl(data.gameUrl)) throw new Error("The administrator has not added a valid private Gartic Phone room link yet.");
       show("join-panel", false);
       show("session-panel", true);
@@ -47,12 +50,13 @@ if (document.body.dataset.page === "student") {
 
   async function heartbeat() {
     if (!code) return;
-    try { await api("/api/heartbeat", { method: "POST", body: JSON.stringify({ code }) }); } catch (_) {}
+    try { await api("/api/heartbeat", { method: "POST", body: JSON.stringify({ code, clientId }) }); } catch (error) { if (error.message.includes("disconnected")) endLocalSession("The administrator disconnected you."); }
   }
   async function checkStatus() {
     try {
-      const data = await api("/api/status?code=" + encodeURIComponent(code));
-      if (!data.active) endLocalSession();
+      const data = await api("/api/status?code=" + encodeURIComponent(code) + "&clientId=" + encodeURIComponent(clientId));
+      if (!data.active) endLocalSession("The administrator ended the session.");
+      else if (data.kicked) endLocalSession("The administrator disconnected you.");
       else {
         if (data.gameUrl && gameLink.href !== data.gameUrl) {
           gameLink.href = data.gameUrl;
@@ -64,7 +68,7 @@ if (document.body.dataset.page === "student") {
       $("session-status").textContent = "Connection interrupted. Reconnecting…";
     }
   }
-  function endLocalSession() {
+  function endLocalSession(message = "The managed session has ended.") {
     clearInterval(poller);
     code = "";
     gameFrame.src = "about:blank";
@@ -72,6 +76,8 @@ if (document.body.dataset.page === "student") {
     show("session-panel", false);
     show("join-panel", false);
     show("ended-panel", true);
+    const endedText = $("ended-panel").querySelector("p");
+    if (endedText) endedText.textContent = message;
   }
   $("back-button").addEventListener("click", () => {
     show("ended-panel", false);
@@ -81,13 +87,14 @@ if (document.body.dataset.page === "student") {
   });
   window.addEventListener("pagehide", () => {
     if (code && navigator.sendBeacon) {
-      navigator.sendBeacon(API_BASE + "/api/leave", new Blob([JSON.stringify({ code })], { type: "application/json" }));
+      navigator.sendBeacon(API_BASE + "/api/leave", new Blob([JSON.stringify({ code, clientId })], { type: "application/json" }));
     }
   });
 }
 
 if (document.body.dataset.page === "admin") {
   let token = "";
+  let adminPoller = null;
   const auth = () => ({ "X-Admin-Token": token });
 
   const roomCreator = $("room-creator-container");
@@ -116,6 +123,8 @@ if (document.body.dataset.page === "admin") {
       await refresh();
       show("room-creator-panel", true);
       show("controls-panel", true);
+      if (adminPoller) clearInterval(adminPoller);
+      adminPoller = setInterval(() => refresh().catch(() => {}), 5000);
       $("admin-message").textContent = "Connected.";
     } catch (error) {
       token = "";
@@ -131,7 +140,10 @@ if (document.body.dataset.page === "admin") {
     $("status-pill").style.color = active ? "var(--cyan)" : "var(--muted)";
     $("start-button").disabled = active;
     $("end-button").disabled = !active;
+    $("lock-button").disabled = !active;
+    $("lock-button").textContent = data.locked ? "Unlock new joins" : "Lock new joins";
     show("code-display", active);
+    renderParticipants(data.members || []);
     if (active) {
       $("session-code").textContent = data.code;
       $("game-url").value = data.gameUrl || "";
@@ -141,6 +153,46 @@ if (document.body.dataset.page === "admin") {
       $("active-room-wrap").hidden = true;
     }
   }
+
+  function renderParticipants(members) {
+    const list = $("participant-list");
+    list.replaceChildren();
+    if (!members.length) {
+      const empty = document.createElement("p");
+      empty.className = "small muted";
+      empty.textContent = "No participants connected.";
+      list.append(empty);
+      return;
+    }
+    members.forEach((member, index) => {
+      const row = document.createElement("div");
+      row.className = "participant-row";
+      const label = document.createElement("span");
+      label.textContent = "Participant " + (index + 1);
+      const button = document.createElement("button");
+      button.className = "danger";
+      button.type = "button";
+      button.textContent = "Disconnect";
+      button.addEventListener("click", async () => {
+        if (!confirm("Disconnect this participant from the managed portal?")) return;
+        try {
+          await api("/api/admin/kick", { method: "POST", headers: auth(), body: JSON.stringify({ clientId: member.clientId }) });
+          await refresh();
+        } catch (error) { $("admin-message").textContent = error.message; }
+      });
+      row.append(label, button);
+      list.append(row);
+    });
+  }
+
+  $("lock-button").addEventListener("click", async () => {
+    const lock = $("lock-button").textContent.includes("Lock new joins");
+    try {
+      await api("/api/admin/lock", { method: "POST", headers: auth(), body: JSON.stringify({ locked: lock }) });
+      await refresh();
+      $("admin-message").textContent = lock ? "New joins are locked." : "New joins are open.";
+    } catch (error) { $("admin-message").textContent = error.message; }
+  });
 
   $("start-button").addEventListener("click", async () => {
     const gameUrl = $("game-url").value.trim();
@@ -165,12 +217,12 @@ if (document.body.dataset.page === "admin") {
   });
 
   $("end-button").addEventListener("click", async () => {
-    if (!confirm("End this managed session for all connected portal users?")) return;
+    if (!confirm("Force disconnect everyone and end this managed session?")) return;
     try {
       await api("/api/admin/end", { method: "POST", headers: auth() });
       await refresh();
       $("game-url").value = "";
-      $("admin-message").textContent = "Session ended.";
+      $("admin-message").textContent = "Everyone has been disconnected. Session ended.";
     } catch (error) {
       $("admin-message").textContent = error.message;
     }
