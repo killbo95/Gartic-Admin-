@@ -94,6 +94,7 @@ if (document.body.dataset.page === "admin") {
     $("admin-message").textContent = "Connecting…";
     try {
       await refresh();
+      show("room-creator-panel", true);
       show("controls-panel", true);
       $("admin-message").textContent = "Connected.";
     } catch (error) {
