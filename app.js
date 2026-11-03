@@ -1,5 +1,5 @@
 // Set this to the deployed Cloudflare Worker URL before publishing.
-const API_BASE = "https://YOUR-WORKER.workers.dev";
+const API_BASE = "https://gartic-admin-session.yahyamsalam2.workers.dev";
 const $ = (id) => document.getElementById(id);
 const api = async (path, options = {}) => {
   if (API_BASE.includes("YOUR-WORKER")) throw new Error("The Worker URL has not been configured in app.js yet.");
