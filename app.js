@@ -144,6 +144,8 @@ if (document.body.dataset.page === "admin") {
     $("max-participants").value = data.maxParticipants || 0;
     $("waiting-room-toggle").checked = Boolean(data.waitingRoom);
     $("announcement-input").value = data.announcement || "";
+    $("duration-minutes").value = data.durationMinutes || $("duration-minutes").value || 0;
+    $("session-countdown").value = data.endsAt ? Math.max(0, Math.ceil((data.endsAt - Date.now()) / 60000)) + " min remaining" : "Not timed";
     renderEvents("message-list", data.messages || [], item => item.from + ": " + item.message);
     renderEvents("activity-list", data.activity || [], item => item.type + (item.detail ? " — " + item.detail : ""));
     renderEvents("history-list", data.history || [], item => item.code + " · " + new Date(item.startedAt).toLocaleString() + " · " + item.participants + " participants");
@@ -214,7 +216,7 @@ if (document.body.dataset.page === "admin") {
       const data = await api("/api/admin/start", {
         method: "POST",
         headers: auth(),
-        body: JSON.stringify({ gameUrl })
+        body: JSON.stringify({ gameUrl, durationMinutes: Number($("duration-minutes").value) || 0 })
       });
       await refresh();
       $("session-code").textContent = data.code;
@@ -263,3 +265,24 @@ if (document.body.dataset.page === "admin") {
   });
   document.body.insertAdjacentHTML("afterbegin", '<button class="theme-toggle" id="theme-toggle" type="button">Toggle theme</button>');
   $("theme-toggle").addEventListener("click", () => document.body.classList.toggle("light-mode"));
+
+  $("announcement-template").addEventListener("change", () => { if ($("announcement-template").value) $("announcement-input").value = $("announcement-template").value; });
+  function loadPresets() {
+    const select = $("preset-select"); select.replaceChildren(new Option("Saved presets…", ""));
+    let presets = []; try { presets = JSON.parse(localStorage.getItem("gartic-admin-presets") || "[]"); } catch (_) {}
+    presets.forEach((preset, index) => select.add(new Option(preset.name, String(index))));
+  }
+  loadPresets();
+  $("save-preset-button").addEventListener("click", () => {
+    const name = $("preset-name").value.trim(); if (!name) { $("admin-message").textContent = "Enter a name for this preset."; return; }
+    let presets = []; try { presets = JSON.parse(localStorage.getItem("gartic-admin-presets") || "[]"); } catch (_) {}
+    presets.push({ name, durationMinutes: Number($("duration-minutes").value) || 0, maxParticipants: Number($("max-participants").value) || 0, waitingRoom: $("waiting-room-toggle").checked });
+    localStorage.setItem("gartic-admin-presets", JSON.stringify(presets.slice(-20))); loadPresets(); $("admin-message").textContent = "Preset saved in this browser.";
+  });
+  $("load-preset-button").addEventListener("click", () => {
+    const index = Number($("preset-select").value); let presets = [];
+    try { presets = JSON.parse(localStorage.getItem("gartic-admin-presets") || "[]"); } catch (_) {}
+    const preset = presets[index]; if (!preset) return;
+    $("duration-minutes").value = preset.durationMinutes || 0; $("max-participants").value = preset.maxParticipants || 0; $("waiting-room-toggle").checked = Boolean(preset.waitingRoom);
+    $("admin-message").textContent = "Preset loaded. Save session settings to apply participant rules.";
+  });
