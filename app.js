@@ -47,6 +47,11 @@ if (document.body.dataset.page === "student") {
     $("session-status").textContent = "Connected to session " + code + (data.paused ? " · Session paused by administrator." : ".");
     gameLink.href = data.gameUrl; gameFrame.src = data.gameUrl; updateAnnouncement(data.announcement); heartbeat();
   }
+  function updateWarning(message) {
+    const box = $("student-warning");
+    if (message) { box.textContent = "ADMIN WARNING: " + message; show("student-warning", true); }
+    else show("student-warning", false);
+  }
   function updateAnnouncement(message) {
     const box = $("student-announcement");
     if (message) { box.textContent = "ADMIN: " + message; show("student-announcement", true); }
@@ -64,7 +69,7 @@ if (document.body.dataset.page === "student") {
       if (data.kicked) return endLocalSession("The administrator disconnected you.");
       if (data.full || data.locked) return endLocalSession(data.full ? "The session is full." : "New joining has been locked.");
       if (data.waiting) { show("waiting-panel", true); show("session-panel", false); $("waiting-status").textContent = "Your request is waiting for administrator approval."; return; }
-      activateSession(data); updateAnnouncement(data.announcement);
+      activateSession(data); updateAnnouncement(data.announcement); updateWarning(data.warning);
       $("session-status").textContent = data.paused ? "Session paused by administrator. Please wait." : "Connected to session " + code + ".";
       await heartbeat();
     } catch (_) { $("session-status").textContent = "Connection interrupted. Reconnecting…"; }
@@ -137,6 +142,7 @@ if (document.body.dataset.page === "admin") {
     $("status-pill").style.color = active ? "var(--cyan)" : "var(--muted)";
     $("start-button").disabled = active;
     $("end-button").disabled = !active;
+    $("regenerate-code-button").disabled = !active;
     $("lock-button").disabled = !active;
     $("lock-button").textContent = data.locked ? "Unlock new joins" : "Lock new joins";
     $("pause-button").disabled = !active;
@@ -190,6 +196,7 @@ if (document.body.dataset.page === "admin") {
           await refresh();
         } catch (error) { $("admin-message").textContent = error.message; }
       });
+      if (member.approved) { const warn = document.createElement("button"); warn.className = "secondary"; warn.type = "button"; warn.textContent = "Warn"; warn.addEventListener("click", async () => { const message = prompt("Enter a short private warning for this participant:"); if (!message) return; try { await api("/api/admin/warn", { method: "POST", headers: auth(), body: JSON.stringify({ clientId: member.clientId, message }) }); await refresh(); } catch (error) { $("admin-message").textContent = error.message; } }); row.append(warn); }
       row.append(label, button);
       list.append(row);
     });
@@ -285,4 +292,10 @@ if (document.body.dataset.page === "admin") {
     const preset = presets[index]; if (!preset) return;
     $("duration-minutes").value = preset.durationMinutes || 0; $("max-participants").value = preset.maxParticipants || 0; $("waiting-room-toggle").checked = Boolean(preset.waitingRoom);
     $("admin-message").textContent = "Preset loaded. Save session settings to apply participant rules.";
+  });
+
+  $("regenerate-code-button").addEventListener("click", async () => {
+    if (!confirm("Regenerate the session code? All current portal participants will be disconnected and must join with the new code.")) return;
+    try { const data = await api("/api/admin/regenerate", { method: "POST", headers: auth() }); await refresh(); $("session-code").textContent = data.code; $("admin-message").textContent = "New session code created. Share it with participants."; }
+    catch (error) { $("admin-message").textContent = error.message; }
   });
