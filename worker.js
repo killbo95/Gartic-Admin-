@@ -78,8 +78,10 @@ export class SessionRoom {
     if (url.pathname === "/admin-status" && request.method === "GET") {
       const now = Date.now();
       for (const [id, member] of Object.entries(state.members)) {
-        if (member.approved && now - (member.lastSeen || 0) >= 25000) {
-          log("Participant timed out", member.displayName);
+        const staleLimit = member.approved ? 25000 : 10 * 60 * 1000;
+        const lastActivity = member.approved ? (member.lastSeen || 0) : (member.joinedAt || 0);
+        if (now - lastActivity >= staleLimit) {
+          if (member.approved) log("Participant timed out", member.displayName);
           delete state.members[id];
         }
       }
@@ -124,6 +126,8 @@ export class SessionRoom {
     if (url.pathname === "/approve" && request.method === "POST") {
       const data = await readBody(); const member = state.members[String(data.clientId || "")];
       if (!state.active || !member) return Response.json({ error: "Participant is no longer waiting." }, { status: 404 });
+      const approvedCount = Object.values(state.members).filter(item => item.approved).length;
+      if (state.maxParticipants > 0 && approvedCount >= state.maxParticipants) return Response.json({ error: "The participant limit has been reached." }, { status: 409 });
       member.approved = true; member.lastSeen = Date.now(); log("Participant approved", member.displayName);
       await save(); return Response.json({ ok: true });
     }
