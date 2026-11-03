@@ -11,4 +11,4 @@ tag = "v1"
 new_sqlite_classes = ["SessionRoom"]
 
 [vars]
-ALLOWED_ORIGIN = "https://killbo95.github.io"
+ALLOWED_ORIGIN = "https://1d0b594d.gartic-admin.pages.dev"
