@@ -23,6 +23,7 @@ export class SessionRoom {
       const clientId = String(data.clientId || "");
       if (!clientId || state.kicked?.[clientId]) return Response.json({ error: "You were disconnected by the administrator." }, { status: 403 });
       state.members ||= {};
+      if (state.locked && !state.members[clientId]) return Response.json({ error: "This session is locked to new participants." }, { status: 423 });
       state.members[clientId] = { lastSeen: Date.now() };
       await this.ctx.storage.put("session", state);
       return Response.json({ ok: true });
