@@ -18,16 +18,17 @@
     <section class="panel" id="join-panel">
       <h2>Join a session</h2>
       <form id="join-form">
-        <label for="room-code">Session code</label>
+        <label for="student-name">Your display name</label><input id="student-name" maxlength="24" autocomplete="nickname" placeholder="Enter your name" required><label for="room-code">Session code</label>
         <div class="join-row"><input id="room-code" name="code" maxlength="6" autocomplete="off" placeholder="6-character code" required><button class="primary" type="submit">Join session</button></div>
       </form>
       <p class="message" id="join-message" aria-live="polite"></p>
     </section>
+    <section class="panel hidden" id="waiting-panel"><p class="eyebrow">WAITING ROOM</p><h2>Waiting for approval</h2><p id="waiting-status" class="muted">The administrator will approve your request to join.</p></section>
     <section class="panel hidden" id="session-panel">
       <div class="session-head"><div><p class="eyebrow">SESSION ACTIVE</p><h2>You're connected</h2></div><span class="live-dot">LIVE</span></div>
-      <p id="session-status">Waiting for session details…</p><p class="small muted" id="portal-control-note">The administrator can disconnect this portal at any time.</p>
+      <p id="session-status">Waiting for session details…</p><div class="announcement hidden" id="student-announcement" role="status"></div><p class="small muted" id="portal-control-note">The administrator can disconnect this portal at any time.</p>
       <div class="notice"><strong>Your private Gartic Phone room</strong><p>Use the button to open the exact room link supplied by the administrator. If the game does not load here, Gartic Phone may block embedding; the official room link will still open separately.</p><a class="text-link" id="game-room-link" href="#" target="_blank" rel="noopener noreferrer">Open private Gartic Phone room ↗</a></div>
-      <div class="game-frame"><iframe id="game-frame" title="Private Gartic Phone room" src="about:blank" allow="fullscreen; clipboard-read; clipboard-write" referrerpolicy="strict-origin-when-cross-origin"></iframe></div>
+      <div class="student-message-box"><form id="student-message-form"><label for="student-message">Message the administrator</label><div class="join-row"><input id="student-message" maxlength="300" placeholder="Write a message…" required><button class="secondary" type="submit">Send</button></div></form><p class="message" id="student-message-status" aria-live="polite"></p></div><div class="game-frame"><iframe id="game-frame" title="Private Gartic Phone room" src="about:blank" allow="fullscreen; clipboard-read; clipboard-write" referrerpolicy="strict-origin-when-cross-origin"></iframe></div>
       <p class="small muted">Keep this portal open during the session so it can receive session updates.</p>
     </section>
     <section class="panel ended hidden" id="ended-panel" role="status"><div class="end-icon">✓</div><h2>Session ended</h2><p>The administrator has ended this managed session. You are disconnected from the portal.</p><button class="secondary" id="back-button" type="button">Back to join page</button></section>
