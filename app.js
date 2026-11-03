@@ -19,13 +19,14 @@ const isOfficialRoomUrl = (value) => {
 };
 
 if (document.body.dataset.page === "student") {
-  let code = "", poller = null, gameLoaded = false;
+  let code = "", poller = null, gameLoaded = false, sessionEnded = false;
   const clientId = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : "client-" + Math.random().toString(36).slice(2);
   const gameFrame = $("game-frame"), gameLink = $("game-room-link");
   const displayName = () => $("student-name").value.trim().slice(0, 24) || "Student";
   $("join-form").addEventListener("submit", async event => {
     event.preventDefault(); $("join-message").textContent = "Checking session…";
     code = $("room-code").value.trim().toUpperCase();
+    sessionEnded = false;
     try {
       const data = await getStudentStatus();
       if (!data.active) throw new Error("That session is not active. Check the code with the administrator.");
@@ -35,7 +36,7 @@ if (document.body.dataset.page === "student") {
       show("join-panel", false);
       if (data.waiting) { show("waiting-panel", true); $("waiting-status").textContent = "Your request has been sent. Keep this page open while the administrator reviews it."; }
       else activateSession(data);
-      poller = setInterval(checkStatus, 3500);
+      poller = setInterval(checkStatus, 1500);
     } catch (error) { code = ""; $("join-message").textContent = error.message; }
   });
   async function getStudentStatus() {
@@ -58,13 +59,18 @@ if (document.body.dataset.page === "student") {
     else show("student-announcement", false);
   }
   async function heartbeat() {
-    if (!code || !gameLoaded) return;
-    try { await api("/api/heartbeat", { method: "POST", body: JSON.stringify({ code, clientId }) }); }
-    catch (error) { if (/disconnected|ended|approval/i.test(error.message)) endLocalSession(error.message); }
+    const currentCode = code;
+    if (!currentCode || !gameLoaded || sessionEnded) return;
+    try { await api("/api/heartbeat", { method: "POST", body: JSON.stringify({ code: currentCode, clientId }) }); }
+    catch (error) { if (code === currentCode && /disconnected|ended|approval/i.test(error.message)) endLocalSession(error.message); }
   }
   async function checkStatus() {
+    const currentCode = code;
+    if (!currentCode || sessionEnded) return;
     try {
-      const data = await getStudentStatus();
+      const data = await api("/api/status?code=" + encodeURIComponent(currentCode) + "&clientId=" + encodeURIComponent(clientId) + "&displayName=" + encodeURIComponent(displayName()));
+      // Ignore delayed responses from a previous session or requests that finish after disconnect.
+      if (sessionEnded || code !== currentCode) return;
       if (!data.active) return endLocalSession("The administrator ended the session.");
       if (data.kicked) return endLocalSession("The administrator disconnected you.");
       if (data.full || data.locked) return endLocalSession(data.full ? "The session is full." : "New joining has been locked.");
@@ -72,7 +78,7 @@ if (document.body.dataset.page === "student") {
       activateSession(data); updateAnnouncement(data.announcement); updateWarning(data.warning);
       $("session-status").textContent = data.paused ? "Session paused by administrator. Please wait." : "Connected to session " + code + ".";
       await heartbeat();
-    } catch (_) { $("session-status").textContent = "Connection interrupted. Reconnecting…"; }
+    } catch (_) { if (!sessionEnded && code === currentCode) $("session-status").textContent = "Connection interrupted. Reconnecting…"; }
   }
   $("student-message-form").addEventListener("submit", async event => {
     event.preventDefault(); const message = $("student-message").value.trim(); if (!message) return;
@@ -80,7 +86,9 @@ if (document.body.dataset.page === "student") {
     catch (error) { $("student-message-status").textContent = error.message; }
   });
   function endLocalSession(message = "The managed session has ended.") {
-    clearInterval(poller); code = ""; gameLoaded = false; gameFrame.src = "about:blank"; gameLink.href = "#";
+    if (sessionEnded) return;
+    sessionEnded = true;
+    clearInterval(poller); poller = null; code = ""; gameLoaded = false; gameFrame.src = "about:blank"; gameLink.href = "#";
     show("session-panel", false); show("waiting-panel", false); show("join-panel", false); show("ended-panel", true);
     const endedText = $("ended-panel").querySelector("p");
     if (endedText) endedText.textContent = message + " This tab will try to close automatically.";
