@@ -1,6 +1,17 @@
 export class SessionRoom {
   constructor(ctx, env) { this.ctx = ctx; this.env = env; }
 
+  async alarm() {
+    let state = await this.ctx.storage.get("session");
+    if (!state?.active || !state.endsAt) return;
+    if (state.endsAt > Date.now()) { await this.ctx.storage.setAlarm(state.endsAt); return; }
+    state.history ||= [];
+    state.history.unshift({ code: state.code, startedAt: state.startedAt, endedAt: Date.now(), participants: Object.keys(state.members || {}).length, reason: "Time limit reached" });
+    state.history = state.history.slice(0, 30);
+    state.active = false; state.code = null; state.gameUrl = null; state.members = {}; state.kicked = {}; state.locked = false; state.paused = false; state.announcement = "";
+    await this.ctx.storage.put("session", state);
+  }
+
   async fetch(request) {
     const url = new URL(request.url);
     const readBody = async () => { try { return await request.json(); } catch { return {}; } };
@@ -81,7 +92,7 @@ export class SessionRoom {
       return Response.json({
         active: Boolean(state.active), code: state.active ? state.code : null,
         gameUrl: state.active ? state.gameUrl || null : null, locked: Boolean(state.locked),
-        paused: Boolean(state.paused), waitingRoom: Boolean(state.waitingRoom),
+        paused: Boolean(state.paused), waitingRoom: Boolean(state.waitingRoom), endsAt: state.endsAt || null,
         maxParticipants: state.maxParticipants || 0, announcement: state.announcement || "",
         members, messages: state.messages, activity: state.activity, history: state.history
       });
@@ -148,13 +159,17 @@ export class SessionRoom {
       if (parsed.protocol !== "https:" || !["garticphone.com", "www.garticphone.com"].includes(parsed.hostname)) return Response.json({ error: "Only HTTPS invitation links from garticphone.com are accepted." }, { status: 400 });
       const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; const bytes = new Uint8Array(6); crypto.getRandomValues(bytes);
       const code = Array.from(bytes, b => alphabet[b % alphabet.length]).join("");
+      const durationMinutes = Math.max(0, Math.min(360, Number(data.durationMinutes) || 0));
+      const endsAt = durationMinutes ? Date.now() + durationMinutes * 60000 : null;
       state = {
-        active: true, code, gameUrl: parsed.href, startedAt: Date.now(), members: {}, kicked: {},
+        active: true, code, gameUrl: parsed.href, startedAt: Date.now(), endsAt, members: {}, kicked: {},
         locked: false, paused: false, waitingRoom: false, maxParticipants: 0,
         announcement: "", messages: [], activity: [{ type: "Session started", detail: "", at: Date.now() }],
         history: state.history || []
       };
-      await save(); return Response.json({ active: true, code, gameUrl: state.gameUrl });
+      await save();
+      if (endsAt) await this.ctx.storage.setAlarm(endsAt); else await this.ctx.storage.deleteAlarm();
+      return Response.json({ active: true, code, gameUrl: state.gameUrl, endsAt });
     }
 
     if (url.pathname === "/end" && request.method === "POST") {
@@ -162,7 +177,8 @@ export class SessionRoom {
         state.history.unshift({ code: state.code, startedAt: state.startedAt, endedAt: Date.now(), participants: Object.keys(state.members).length });
         state.history = state.history.slice(0, 30);
       }
-      state = { ...state, active: false, code: null, gameUrl: null, endedAt: Date.now(), members: {}, kicked: {}, locked: false, paused: false, announcement: "" };
+      state = { ...state, active: false, code: null, gameUrl: null, endedAt: Date.now(), endsAt: null, members: {}, kicked: {}, locked: false, paused: false, announcement: "" };
+      await this.ctx.storage.deleteAlarm();
       await this.ctx.storage.put("session", state); return Response.json({ active: false });
     }
 
