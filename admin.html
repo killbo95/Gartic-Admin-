@@ -20,7 +20,11 @@
     </section>
     <section class="panel hidden" id="controls-panel">
       <div class="session-head"><div><p class="eyebrow">CURRENT STATUS</p><h2 id="admin-status">No active session</h2></div><span class="status-pill" id="status-pill">IDLE</span></div>
+      <label for="game-url">Private Gartic Phone invitation URL</label>
+      <input id="game-url" type="url" inputmode="url" autocomplete="url" placeholder="https://garticphone.com/..." required>
+      <p class="small muted">Create a private room on Gartic Phone first, then paste its invitation URL here. Only official garticphone.com links are accepted.</p>
       <div class="code-display hidden" id="code-display"><span>SESSION CODE</span><strong id="session-code">------</strong></div>
+      <p class="small" id="active-room-wrap" hidden>Active room: <a class="text-link" id="admin-game-link" href="#" target="_blank" rel="noopener noreferrer">Open private room ↗</a></p>
       <div class="button-row"><button class="primary" id="start-button" type="button">Start session</button><button class="danger" id="end-button" type="button" disabled>End session</button></div>
       <p class="small muted">Ending a session updates connected portals. It cannot force-close other browser tabs or control devices outside this portal.</p>
     </section>
