@@ -32,8 +32,11 @@
       <p class="small muted">Create the room in the panel above, copy its invitation URL, and paste it here. Only official garticphone.com links are accepted.</p>
       <div class="code-display hidden" id="code-display"><span>SESSION CODE</span><strong id="session-code">------</strong></div>
       <p class="small" id="active-room-wrap" hidden>Active room: <a class="text-link" id="admin-game-link" href="#" target="_blank" rel="noopener noreferrer">Open private room ↗</a></p>
-      <div class="button-row"><button class="primary" id="start-button" type="button">Start session</button><button class="danger" id="end-button" type="button" disabled>End session</button></div>
-      <p class="small muted">Ending a session updates connected portals. It cannot force-close other browser tabs or control devices outside this portal.</p>
+      <div class="button-row"><button class="primary" id="start-button" type="button">Start session</button><button class="secondary" id="lock-button" type="button" disabled>Lock new joins</button><button class="danger" id="end-button" type="button" disabled>Force disconnect all</button></div>
+      <h3>Connected participants</h3>
+      <p class="small muted">Participants currently checking in through this portal. A disconnected or offline browser will disappear after about 20 seconds.</p>
+      <div id="participant-list" class="participant-list"><p class="small muted">No participants connected.</p></div>
+      <p class="small muted">Force disconnect ends the managed session for everyone. Lock prevents new joins. These controls cannot close unrelated tabs or control devices outside this portal.</p>
     </section>
     <footer>Gartic Admin · Admin actions are recorded by the session service</footer>
   </main>
