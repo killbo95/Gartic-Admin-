@@ -77,7 +77,15 @@ if (document.body.dataset.page === "student") {
     show("join-panel", false);
     show("ended-panel", true);
     const endedText = $("ended-panel").querySelector("p");
-    if (endedText) endedText.textContent = message;
+    if (endedText) endedText.textContent = message + " This tab will try to close automatically.";
+    // Browsers only allow scripts to close tabs they opened themselves.
+    // Attempt it, while keeping the ended screen as a fallback if blocked.
+    window.close();
+    window.setTimeout(() => {
+      if (!window.closed && endedText) {
+        endedText.textContent = message + " Your browser did not allow this tab to close. You can close it manually.";
+      }
+    }, 300);
   }
   $("back-button").addEventListener("click", () => {
     show("ended-panel", false);
