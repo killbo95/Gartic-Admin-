@@ -16,7 +16,7 @@ export class SessionRoom {
     const url = new URL(request.url);
     const readBody = async () => { try { return await request.json(); } catch { return {}; } };
     let state = await this.ctx.storage.get("session") || {
-      active: false, code: null, gameUrl: null, members: {}, kicked: {}, locked: false,
+      active: false, code: null, gameUrl: null, gameType: "garticphone", members: {}, kicked: {}, locked: false,
       paused: false, waitingRoom: false, maxParticipants: 0, announcement: "",
       messages: [], activity: [], history: []
     };
@@ -48,7 +48,7 @@ export class SessionRoom {
       member = state.members[clientId] || {};
       return Response.json({
         active: true, waiting: Boolean(member.approved === false), paused: Boolean(state.paused),
-        gameUrl: member.approved ? state.gameUrl : null, announcement: state.announcement || "",
+        gameUrl: member.approved ? state.gameUrl : null, gameType: state.gameType || "garticphone", announcement: state.announcement || "",
         warning: member.warning || "", displayName: member.displayName || displayName
       });
     }
@@ -93,7 +93,7 @@ export class SessionRoom {
       }));
       return Response.json({
         active: Boolean(state.active), code: state.active ? state.code : null,
-        gameUrl: state.active ? state.gameUrl || null : null, locked: Boolean(state.locked),
+        gameUrl: state.active ? state.gameUrl || null : null, gameType: state.active ? state.gameType || "garticphone" : null, locked: Boolean(state.locked),
         paused: Boolean(state.paused), waitingRoom: Boolean(state.waitingRoom), endsAt: state.endsAt || null,
         maxParticipants: state.maxParticipants || 0, announcement: state.announcement || "",
         members, messages: state.messages, activity: state.activity, history: state.history
@@ -175,21 +175,23 @@ export class SessionRoom {
     if (url.pathname === "/start" && request.method === "POST") {
       if (state.active) return Response.json({ error: "A session is already active." }, { status: 409 });
       const data = await readBody(); let parsed;
-      try { parsed = new URL(String(data.gameUrl || "")); } catch { return Response.json({ error: "Enter a valid Gartic Phone invitation URL." }, { status: 400 }); }
-      if (parsed.protocol !== "https:" || !["garticphone.com", "www.garticphone.com"].includes(parsed.hostname)) return Response.json({ error: "Only HTTPS invitation links from garticphone.com are accepted." }, { status: 400 });
+      const gameType = data.gameType === "makeitmeme" ? "makeitmeme" : "garticphone";
+      try { parsed = new URL(String(data.gameUrl || "")); } catch { return Response.json({ error: "Enter a valid official game invitation URL." }, { status: 400 }); }
+      const allowedHosts = gameType === "makeitmeme" ? ["makeitmeme.com", "www.makeitmeme.com"] : ["garticphone.com", "www.garticphone.com"];
+      if (parsed.protocol !== "https:" || !allowedHosts.includes(parsed.hostname)) return Response.json({ error: gameType === "makeitmeme" ? "Only HTTPS invitation links from makeitmeme.com are accepted." : "Only HTTPS invitation links from garticphone.com are accepted." }, { status: 400 });
       const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; const bytes = new Uint8Array(6); crypto.getRandomValues(bytes);
       const code = Array.from(bytes, b => alphabet[b % alphabet.length]).join("");
       const durationMinutes = Math.max(0, Math.min(360, Number(data.durationMinutes) || 0));
       const endsAt = durationMinutes ? Date.now() + durationMinutes * 60000 : null;
       state = {
-        active: true, code, gameUrl: parsed.href, startedAt: Date.now(), endsAt, members: {}, kicked: {},
+        active: true, code, gameUrl: parsed.href, gameType, startedAt: Date.now(), endsAt, members: {}, kicked: {},
         locked: false, paused: false, waitingRoom: false, maxParticipants: 0,
         announcement: "", messages: [], activity: [{ type: "Session started", detail: "", at: Date.now() }],
         history: state.history || []
       };
       await save();
       if (endsAt) await this.ctx.storage.setAlarm(endsAt); else await this.ctx.storage.deleteAlarm();
-      return Response.json({ active: true, code, gameUrl: state.gameUrl, endsAt });
+      return Response.json({ active: true, code, gameUrl: state.gameUrl, gameType: state.gameType, endsAt });
     }
 
     if (url.pathname === "/end" && request.method === "POST") {
