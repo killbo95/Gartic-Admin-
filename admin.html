@@ -20,16 +20,17 @@
     </section>
     <section class="panel hidden" id="room-creator-panel">
       <div class="session-head"><div><p class="eyebrow">ROOM CREATOR</p><h2>Create your Gartic Phone room</h2></div><span class="status-pill">EMBEDDED</span></div>
-      <p class="small muted">Create the private room in this panel. When Gartic Phone gives you an invitation link, copy it and paste it into the field below. The room creator may refuse to load inside another website; if that happens, use the official-site link as a fallback.</p>
+      <p class="small muted">For Gartic Phone, create a private room below. For Make it Meme, create a private lobby on the official site using the link below. Copy the game invitation URL and paste it into the session controls.</p><p class="small"><a class="text-link" href="https://makeitmeme.com/" target="_blank" rel="noopener noreferrer">Open official Make it Meme ↗</a></p>
       <div class="button-row room-tools"><button class="secondary" id="room-fullscreen-button" type="button">Enter full screen ⛶</button></div>
       <div class="room-creator-frame" id="room-creator-container"><iframe id="room-creator-frame" title="Gartic Phone room creator" src="https://garticphone.com/" allow="fullscreen; clipboard-read; clipboard-write" referrerpolicy="strict-origin-when-cross-origin"></iframe></div>
       <p class="small"><a class="text-link" href="https://garticphone.com/" target="_blank" rel="noopener noreferrer">Open official Gartic Phone in a separate tab ↗</a></p>
     </section>
     <section class="panel hidden" id="controls-panel">
       <div class="session-head"><div><p class="eyebrow">CURRENT STATUS</p><h2 id="admin-status">No active session</h2></div><span class="status-pill" id="status-pill">IDLE</span></div>
-      <label for="game-url">Private Gartic Phone invitation URL</label>
+      <label for="game-type">Choose game</label><select id="game-type"><option value="garticphone">Gartic Phone</option><option value="makeitmeme">Make it Meme</option></select>
+      <label for="game-url">Private game invitation URL</label>
       <input id="game-url" type="url" inputmode="url" autocomplete="url" placeholder="https://garticphone.com/..." required>
-      <p class="small muted">Create the room in the panel above, copy its invitation URL, and paste it here. Only official garticphone.com links are accepted.</p>
+      <p class="small muted" id="game-url-help">Create a private Gartic Phone room in the panel above, then paste its invitation URL. Only official game links are accepted.</p>
       <div class="control-grid"><div><label for="duration-minutes">Session duration in minutes (0 = unlimited)</label><input id="duration-minutes" type="number" min="0" max="360" value="0"></div><div><label for="session-countdown">Time remaining</label><input id="session-countdown" value="Not timed" readonly></div></div><div class="code-display hidden" id="code-display"><span>SESSION CODE</span><strong id="session-code">------</strong></div>
       <p class="small" id="active-room-wrap" hidden>Active room: <a class="text-link" id="admin-game-link" href="#" target="_blank" rel="noopener noreferrer">Open private room ↗</a></p>
       <div class="button-row"><button class="primary" id="start-button" type="button">Start session</button><button class="secondary" id="lock-button" type="button" disabled>Lock new joins</button><button class="secondary" id="regenerate-code-button" type="button" disabled>Regenerate code</button><button class="danger" id="end-button" type="button" disabled>Force disconnect all</button></div>
