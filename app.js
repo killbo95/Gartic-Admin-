@@ -11,10 +11,12 @@ const api = async (path, options = {}) => {
   return data;
 };
 const show = (id, visible) => $(id)?.classList.toggle("hidden", !visible);
-const isOfficialRoomUrl = (value) => {
+const isOfficialRoomUrl = (value, gameType = "garticphone") => {
   try {
     const url = new URL(value);
-    return url.protocol === "https:" && ["garticphone.com", "www.garticphone.com"].includes(url.hostname);
+    if (url.protocol !== "https:") return false;
+    if (gameType === "makeitmeme") return ["makeitmeme.com", "www.makeitmeme.com"].includes(url.hostname);
+    return ["garticphone.com", "www.garticphone.com"].includes(url.hostname);
   } catch (_) { return false; }
 };
 
@@ -62,9 +64,15 @@ if (document.body.dataset.page === "student") {
     return api("/api/status?code=" + encodeURIComponent(code) + "&clientId=" + encodeURIComponent(clientId) + "&displayName=" + encodeURIComponent(displayName()));
   }
   function activateSession(data) {
-    if (gameLoaded || !data.gameUrl || !isOfficialRoomUrl(data.gameUrl)) return;
+    const gameType = data.gameType || "garticphone";
+    if (gameLoaded || !data.gameUrl || !isOfficialRoomUrl(data.gameUrl, gameType)) return;
     gameLoaded = true; show("waiting-panel", false); show("session-panel", true);
-    $("session-status").textContent = "Connected to session " + code + (data.paused ? " · Session paused by administrator." : ".");
+    const gameName = gameType === "makeitmeme" ? "Make it Meme" : "Gartic Phone";
+    $("student-game-title").textContent = "Your private " + gameName + " room";
+    $("student-game-help").textContent = "Use the link to open the exact private room supplied by the administrator. If the game does not load inside this portal, open it separately.";
+    gameLink.textContent = "Open private " + gameName + " room ↗";
+    gameFrame.title = gameName + " private room";
+    $("session-status").textContent = "Connected to " + gameName + " session " + code + (data.paused ? " · Session paused by administrator." : ".");
     gameLink.href = data.gameUrl; gameFrame.src = data.gameUrl; updateAnnouncement(data.announcement); heartbeat();
   }
   function updateWarning(message) {
@@ -144,6 +152,13 @@ if (document.body.dataset.page === "admin") {
       ? "Exit full screen ✕"
       : "Enter full screen ⛶";
   });
+  $("game-type").addEventListener("change", () => {
+    const isMeme = $("game-type").value === "makeitmeme";
+    $("game-url").placeholder = isMeme ? "https://makeitmeme.com/..." : "https://garticphone.com/...";
+    $("game-url-help").textContent = isMeme
+      ? "Create a private lobby on Make it Meme, copy its invitation URL, and paste it here. Only official makeitmeme.com links are accepted."
+      : "Create a private Gartic Phone room in the panel above, then paste its invitation URL. Only official garticphone.com links are accepted.";
+  });
   $("connect-button").addEventListener("click", async () => {
     token = $("admin-token").value.trim();
     $("admin-message").textContent = "Connecting…";
@@ -186,6 +201,8 @@ if (document.body.dataset.page === "admin") {
     renderParticipants(data.members || []);
     if (active) {
       $("session-code").textContent = data.code;
+      $("game-type").value = data.gameType || "garticphone";
+      $("game-type").dispatchEvent(new Event("change"));
       $("game-url").value = data.gameUrl || "";
       $("admin-game-link").href = data.gameUrl || "#";
       $("active-room-wrap").hidden = !data.gameUrl;
@@ -241,8 +258,9 @@ if (document.body.dataset.page === "admin") {
 
   $("start-button").addEventListener("click", async () => {
     const gameUrl = $("game-url").value.trim();
-    if (!isOfficialRoomUrl(gameUrl)) {
-      $("admin-message").textContent = "Paste a valid HTTPS invitation URL from garticphone.com first.";
+    const gameType = $("game-type").value;
+    if (!isOfficialRoomUrl(gameUrl, gameType)) {
+      $("admin-message").textContent = gameType === "makeitmeme" ? "Paste a valid HTTPS invitation URL from makeitmeme.com." : "Paste a valid HTTPS invitation URL from garticphone.com.";
       $("game-url").focus();
       return;
     }
@@ -251,7 +269,7 @@ if (document.body.dataset.page === "admin") {
       const data = await api("/api/admin/start", {
         method: "POST",
         headers: auth(),
-        body: JSON.stringify({ gameUrl, durationMinutes: Number($("duration-minutes").value) || 0 })
+        body: JSON.stringify({ gameUrl, gameType, durationMinutes: Number($("duration-minutes").value) || 0 })
       });
       await refresh();
       $("session-code").textContent = data.code;
