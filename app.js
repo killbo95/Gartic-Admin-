@@ -21,7 +21,7 @@ const isOfficialRoomUrl = (value, gameType = "garticphone") => {
 };
 
 if (document.body.dataset.page === "student") {
-  let code = "", poller = null, gameLoaded = false, sessionEnded = false, monitorPoller = null, studentPeer = null, studentStream = null;
+  let code = "", poller = null, gameLoaded = false, sessionEnded = false, monitorPoller = null, studentPeer = null, studentStream = null, studentIceServers = [], studentPendingCandidates = [];
   const clientId = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : "client-" + Math.random().toString(36).slice(2);
   const gameFrame = $("game-frame"), gameLink = $("game-room-link");
   const gameContainer = $("student-game-container");
@@ -29,6 +29,7 @@ if (document.body.dataset.page === "student") {
   const sendStudentSignal = message => api("/api/student/signal", {method:"POST", body:JSON.stringify({code, clientId, message})});
   async function stopStudentShare(notify=true) {
     if (studentPeer) { studentPeer.close(); studentPeer=null; }
+    studentPendingCandidates=[];
     if (studentStream) { studentStream.getTracks().forEach(track=>track.stop()); studentStream=null; }
     show("student-stop-share-button",false); shareButton.disabled=true;
     if (notify && code) { try { await sendStudentSignal({type:"stopped"}); } catch (_) {} }
@@ -38,7 +39,7 @@ if (document.body.dataset.page === "student") {
     if (!navigator.mediaDevices?.getDisplayMedia) { monitorStatus.textContent="Screen sharing is not supported by this browser."; return; }
     try {
       studentStream=await navigator.mediaDevices.getDisplayMedia({video:true,audio:false});
-      studentPeer=new RTCPeerConnection({iceServers:[{urls:"stun:stun.l.google.com:19302"}]});
+      studentPeer=new RTCPeerConnection({iceServers:studentIceServers.length?studentIceServers:[{urls:"stun:stun.l.google.com:19302"}]});
       studentStream.getTracks().forEach(track=>studentPeer.addTrack(track,studentStream));
       studentPeer.onicecandidate=e=>{if(e.candidate)sendStudentSignal({type:"candidate",candidate:e.candidate}).catch(()=>{});};
       studentStream.getVideoTracks()[0].addEventListener("ended",()=>stopStudentShare(true));
@@ -57,11 +58,11 @@ if (document.body.dataset.page === "student") {
     if(!code||sessionEnded)return;
     try {
       const result=await api("/api/student/signals?code="+encodeURIComponent(code)+"&clientId="+encodeURIComponent(clientId));
-      for(const item of result.messages||[]) {
+      for(const item of result.signals||[]) {
         const m=item.message||{};
         if(m.type==="request"){shareButton.disabled=false;monitorStatus.textContent="Your teacher requested a screen share. Choose Share selected game screen if you agree.";}
-        else if(m.type==="answer"&&studentPeer)await studentPeer.setRemoteDescription(m.description);
-        else if(m.type==="candidate"&&studentPeer){try{await studentPeer.addIceCandidate(m.candidate);}catch(_){}}
+        else if(m.type==="answer"&&studentPeer){await studentPeer.setRemoteDescription(m.description);for(const candidate of studentPendingCandidates.splice(0)){try{await studentPeer.addIceCandidate(candidate);}catch(_){}}}
+        else if(m.type==="candidate"&&studentPeer){if(studentPeer.remoteDescription){try{await studentPeer.addIceCandidate(m.candidate);}catch(_){}}else studentPendingCandidates.push(m.candidate);}
         else if(m.type==="stop")await stopStudentShare(false);
       }
     } catch(_) {}
@@ -106,6 +107,7 @@ if (document.body.dataset.page === "student") {
     return api("/api/status?code=" + encodeURIComponent(code) + "&clientId=" + encodeURIComponent(clientId) + "&displayName=" + encodeURIComponent(displayName()));
   }
   function activateSession(data) {
+    if(Array.isArray(data.iceServers)) studentIceServers=data.iceServers;
     const gameType = data.gameType || "garticphone";
     if (gameLoaded || !data.gameUrl || !isOfficialRoomUrl(data.gameUrl, gameType)) return;
     gameLoaded = true; show("waiting-panel", false); show("session-panel", true);
@@ -174,13 +176,14 @@ if (document.body.dataset.page === "admin") {
   let token = "";
   let adminPoller = null;
   const auth = () => ({ "X-Admin-Token": token });
-  let latestStatus=null, monitoredClientId=null, monitorPeer=null;
+  let latestStatus=null, monitoredClientId=null, monitorPeer=null, adminPendingCandidates=[];
   const monitorVideo=$("monitor-video");
   const sendAdminSignal=(clientId,message)=>api("/api/admin/signal",{method:"POST",headers:auth(),body:JSON.stringify({clientId,message})});
   async function stopMonitor(notify=true){
     const oldId=monitoredClientId;
     if(notify&&oldId){try{await sendAdminSignal(oldId,{type:"stop"});}catch(_){}}
     if(monitorPeer){monitorPeer.close();monitorPeer=null;}
+    adminPendingCandidates=[];
     if(monitorVideo.srcObject)monitorVideo.srcObject.getTracks().forEach(t=>t.stop());
     monitorVideo.srcObject=null;monitoredClientId=null;
     $("monitor-status").textContent="No student screen is being viewed.";
@@ -195,13 +198,14 @@ if (document.body.dataset.page === "admin") {
         const m=item.message||{};
         if(m.type==="offer"&&item.clientId===monitoredClientId){
           if(monitorPeer)monitorPeer.close();
-          monitorPeer=new RTCPeerConnection({iceServers:[{urls:"stun:stun.l.google.com:19302"}]});
+          monitorPeer=new RTCPeerConnection({iceServers:latestStatus?.iceServers?.length?latestStatus.iceServers:[{urls:"stun:stun.l.google.com:19302"}]});
           monitorPeer.ontrack=e=>{monitorVideo.srcObject=e.streams[0];const p=(latestStatus?.members||[]).find(x=>x.clientId===monitoredClientId);$("monitor-status").textContent="Live view · "+(p?.displayName||"Student");};
           monitorPeer.onicecandidate=e=>{if(e.candidate)sendAdminSignal(monitoredClientId,{type:"candidate",candidate:e.candidate}).catch(()=>{});};
           await monitorPeer.setRemoteDescription(m.description);
+          for(const candidate of adminPendingCandidates.splice(0)){try{await monitorPeer.addIceCandidate(candidate);}catch(_){}}
           const answer=await monitorPeer.createAnswer();await monitorPeer.setLocalDescription(answer);
           await sendAdminSignal(monitoredClientId,{type:"answer",description:monitorPeer.localDescription});
-        }else if(m.type==="candidate"&&item.clientId===monitoredClientId&&monitorPeer){try{await monitorPeer.addIceCandidate(m.candidate);}catch(_){}}
+        }else if(m.type==="candidate"&&item.clientId===monitoredClientId){if(monitorPeer?.remoteDescription){try{await monitorPeer.addIceCandidate(m.candidate);}catch(_){}}else adminPendingCandidates.push(m.candidate);}
         else if(m.type==="stopped"&&item.clientId===monitoredClientId){await stopMonitor(false);$("monitor-status").textContent="The student stopped sharing.";}
       }
     }catch(_){}
