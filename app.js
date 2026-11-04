@@ -22,6 +22,25 @@ if (document.body.dataset.page === "student") {
   let code = "", poller = null, gameLoaded = false, sessionEnded = false;
   const clientId = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : "client-" + Math.random().toString(36).slice(2);
   const gameFrame = $("game-frame"), gameLink = $("game-room-link");
+  const gameContainer = $("student-game-container");
+  const studentFullscreenButton = $("student-fullscreen-button");
+  studentFullscreenButton.addEventListener("click", async () => {
+    try {
+      if (document.fullscreenElement === gameContainer) {
+        await document.exitFullscreen();
+      } else {
+        if (!gameContainer.requestFullscreen) throw new Error("Full screen is not supported by this browser.");
+        await gameContainer.requestFullscreen();
+      }
+    } catch (error) {
+      $("session-status").textContent = error.message || "Could not enter full screen. Try your browser's full-screen option.";
+    }
+  });
+  document.addEventListener("fullscreenchange", () => {
+    studentFullscreenButton.textContent = document.fullscreenElement === gameContainer
+      ? "Exit full screen ✕"
+      : "Enter full screen ⛶";
+  });
   const displayName = () => $("student-name").value.trim().slice(0, 24) || "Student";
   $("join-form").addEventListener("submit", async event => {
     event.preventDefault(); $("join-message").textContent = "Checking session…";
